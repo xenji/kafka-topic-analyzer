@@ -11,23 +11,11 @@ use uuid::Uuid;
 use chrono::Utc;
 use rdkafka::message::Message;
 use chrono::prelude::*;
+use rdkafka::consumer::DefaultConsumerContext;
 
-pub struct LoggingConsumerContext;
+pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
-pub type LoggingConsumer = BaseConsumer<LoggingConsumerContext>;
-
-impl ClientContext for LoggingConsumerContext {}
-
-impl ConsumerContext for LoggingConsumerContext {
-    fn commit_callback(&self, result: KafkaResult<()>, _offsets: *mut RDKafkaTopicPartitionList) {
-        match result {
-            Ok(_) => info!("Offsets committed successfully"),
-            Err(e) => warn!("Error while committing offsets: {}", e),
-        };
-    }
-}
-
-pub fn create_client(bootstrap_server: &str) -> LoggingConsumer {
+pub fn create_client(bootstrap_server: &str) -> KafkaConsumer {
     ClientConfig::new()
         .set("group.id", format!("topic-analyzer--{}-{}", env!("USER"), Uuid::new_v4()).as_str())
         .set("bootstrap.servers", bootstrap_server)
@@ -40,11 +28,11 @@ pub fn create_client(bootstrap_server: &str) -> LoggingConsumer {
         .set("queue.buffering.max.ms", "1000")
 
         .set_log_level(RDKafkaLogLevel::Info)
-        .create_with_context(LoggingConsumerContext)
+        .create()
         .expect("Consumer creation failed")
 }
 
-pub fn get_topic_offsets(consumer: &LoggingConsumer, topic: &str, parts: &mut Vec<i32>, start_offsets: &mut HashMap<i32, i64>, end_offsets: &mut HashMap<i32, i64>) {
+pub fn get_topic_offsets(consumer: &KafkaConsumer, topic: &str, parts: &mut Vec<i32>, start_offsets: &mut HashMap<i32, i64>, end_offsets: &mut HashMap<i32, i64>) {
     let md = consumer.fetch_metadata(Option::from(topic), Duration::new(10, 0)).unwrap_or_else(|e| { panic!("Error fetching metadata: {}", e) });
     let topic_metadata = md.topics().first().unwrap_or_else(|| { panic!("Topic not found!") });
 
@@ -57,7 +45,7 @@ pub fn get_topic_offsets(consumer: &LoggingConsumer, topic: &str, parts: &mut Ve
 }
 
 pub fn read_topic_into_metrics(topic: &str,
-                               consumer: &LoggingConsumer,
+                               consumer: &KafkaConsumer,
                                metrics: &mut Metrics,
                                partitions: &[i32],
                                end_offsets: &HashMap<i32, i64>) {
