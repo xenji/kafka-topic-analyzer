@@ -1,17 +1,12 @@
 use metric::Metrics;
-use rdkafka::client::ClientContext;
-use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
-use rdkafka::consumer::{Consumer, ConsumerContext};
-use rdkafka::consumer::BaseConsumer;
-use rdkafka::error::KafkaResult;
-use rdkafka::types::RDKafkaTopicPartitionList;
 use std::collections::HashMap;
 use std::time::Duration;
-use uuid::Uuid;
-use chrono::Utc;
-use rdkafka::message::Message;
 use chrono::prelude::*;
-use rdkafka::consumer::DefaultConsumerContext;
+use chrono::Utc;
+use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
+use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
+use rdkafka::message::Message;
+use uuid::Uuid;
 
 pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
