@@ -22,3 +22,9 @@ it from beginning to end and counting various metrics.
 
 ## Example output
 ![Screenshot from a terminal that shows an example of the output](demo_output.png "Shows a sample output of the tool")
+
+## Installation
+
+By now, the only way of installing it is building it from source or
+via `cargo install kafka-topic-analyzer`. In both cases you need to
+have the rust toolchain installed via [http://rustup.rs/](http://rustup.rs/).
