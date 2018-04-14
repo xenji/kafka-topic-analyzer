@@ -1,0 +1,14 @@
+language: rust
+
+rust:
+  - stable
+  - nightly
+
+sudo: required
+
+os:
+  - linux
+  - osx
+
+script:
+  - cargo build --verbose
