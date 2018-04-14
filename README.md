@@ -21,4 +21,4 @@ it from beginning to end and counting various metrics.
         -t, --topic <TOPIC>                          The topic to analyze
 
 ## Example output
-![demo_ouput.png]
+![Screenshot from a terminal that shows an example of the output](demo_output.png "Shows a sample output of the tool")
