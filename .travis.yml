@@ -85,6 +85,7 @@ matrix:
 
 before_install:
   - set -e
+  - sudo apt-get install g++ -y
   - rustup self update
 
 install:
