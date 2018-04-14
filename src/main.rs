@@ -6,6 +6,7 @@ extern crate rdkafka;
 extern crate uuid;
 extern crate chrono;
 #[macro_use] extern crate prettytable;
+extern crate indicatif;
 
 use clap::{App, Arg};
 use std::collections::HashMap;

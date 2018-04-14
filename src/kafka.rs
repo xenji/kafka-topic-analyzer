@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use chrono::prelude::*;
 use chrono::Utc;
+use indicatif::{ProgressBar, ProgressStyle};
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
 use rdkafka::message::Message;
@@ -50,10 +51,14 @@ pub fn read_topic_into_metrics(topic: &str,
         still_running.insert(p, true);
     }
 
-    info!("Subscribing to {}", topic);
+    println!("Subscribing to {}", topic);
     consumer.subscribe(&[topic]).expect("Can't subscribe to specified topic");
 
-    info!("Starting message consumption...");
+    println!("Starting message consumption...");
+    let sty = ProgressStyle::default_spinner().template("{spinner} [{elapsed_precise}] {msg}");
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(sty.clone());
+
     loop {
         match consumer.poll(Duration::from_millis(100)) {
             None => {}
@@ -106,10 +111,10 @@ pub fn read_topic_into_metrics(topic: &str,
                     metrics.cmp_and_set_message_size(message_size);
                 }
 
-                if seq % 100_000 == 0 {
-                    info!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
-                          seq, topic, partition, offset, timestamp);
-                }
+                pb.inc(1);
+                pb.set_message(
+                    format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
+                          seq, topic, partition, offset, timestamp).as_str());
 
                 if let Err(e) = consumer.store_offset(&m) {
                     warn!("Error while storing offset: {}", e);
@@ -127,6 +132,7 @@ pub fn read_topic_into_metrics(topic: &str,
                 }
 
                 if all_done {
+                    pb.finish_with_message("done");
                     break;
                 }
             }
