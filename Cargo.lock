@@ -130,6 +130,19 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "kafka-topic-analyzer"
+version = "0.1.0"
+dependencies = [
+ "chrono 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.29.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prettytable-rs 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rdkafka 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -431,19 +444,6 @@ dependencies = [
  "libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "topic_analyzer"
-version = "0.1.0"
-dependencies = [
- "chrono 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.29.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "prettytable-rs 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "rdkafka 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

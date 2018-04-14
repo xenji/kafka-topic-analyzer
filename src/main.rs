@@ -22,8 +22,8 @@ mod metric;
 fn main() {
     env_logger::init();
 
-    let matches = App::new("topic-analyzer")
-        .bin_name("topic-analyzer")
+    let matches = App::new("Kafka Topic Analyzer")
+        .bin_name("kafka-topic-analyzer")
 
         .arg(Arg::with_name("topic")
             .short("t")

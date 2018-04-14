@@ -1,15 +1,20 @@
 [package]
-name = "topic_analyzer"
+name = "kafka-topic-analyzer"
 version = "0.1.0"
 authors = ["Mario Mueller <mario@xenji.com>"]
+repository = "https://github.com/xenji/kafka-topic-analyzer"
+license = "MIT"
+keywords = ["cli", "kafka"]
+categories = ["command-line-utilities"]
+description = "An analyzer for getting metrics about the contents of a Apache Kafka topic"
 
 [dependencies]
 clap = "~2.29"
 env_logger = "~0.5"
 log = "~0.4"
-prettytable-rs = "0.6.7"
-uuid = { version = "0.6.2", features = ["v4"] }
-chrono = "0.4"
+prettytable-rs = "~0.6"
+uuid = { version = "~0.6", features = ["v4"] }
+chrono = "~0.4"
 
 [dependencies.rdkafka]
 version = "~0.15"
