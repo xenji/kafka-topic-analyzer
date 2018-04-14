@@ -1,6 +1,7 @@
 # Kafka Topic Analyzer
 
 [![Build Status](https://travis-ci.org/xenji/kafka-topic-analyzer.svg?branch=master)](https://travis-ci.org/xenji/kafka-topic-analyzer)
+[![Current version on crates.io](https://img.shields.io/crates/v/kafka-topic-analyzer.svg)](https://crates.io/crates/kafka-topic-analyzer)
 
 A CLI tool that gathers statistics about a Apache Kafka topic by reading
 it from beginning to end and counting various metrics.
