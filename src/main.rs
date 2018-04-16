@@ -16,6 +16,7 @@ use std::time::Instant;
 use prettytable::Table;
 use prettytable::row::Row;
 use prettytable::cell::Cell;
+use metric::LogCompactionKeyMetrics;
 
 mod kafka;
 mod metric;
@@ -58,6 +59,13 @@ fn main() {
     let mut partitions = Vec::<i32>::new();
     let topic = matches.value_of("topic").unwrap();
     let bootstrap_server = matches.value_of("bootstrap-server").unwrap();
+
+    let mut opt_log_compact_tracking = match matches.value_of("count-alive-keys") {
+        Some(path) => Some(LogCompactionKeyMetrics::new(path)),
+        None => None
+    };
+
+
     let consumer = kafka::create_client(bootstrap_server);
     info!("Gathering offsets...");
     kafka::get_topic_offsets(&consumer, topic, &mut partitions, &mut start_offsets, &mut end_offsets);
@@ -66,8 +74,7 @@ fn main() {
     let mut mr = Metrics::new(partitions.len() as i32);
 
     info!("Start processing...");
-    kafka::read_topic_into_metrics(topic, &consumer, &mut mr, &partitions, &end_offsets);
-
+    kafka::read_topic_into_metrics(topic, &consumer, &mut mr, &mut opt_log_compact_tracking, &partitions, &end_offsets);
     let duration_secs = start_time.elapsed().as_secs();
 
     println!();
@@ -83,6 +90,15 @@ fn main() {
     println!("Largest Message: {} bytes", mr.largest_message());
     println!("Smallest Message: {} bytes", mr.smallest_message());
     println!("Topic Size: {} bytes", mr.overall_size());
+    match opt_log_compact_tracking {
+        Some(lcm) => {
+            println!("{}", "-".repeat(120));
+            println!("Alive keys: {}", lcm.sum_all_alive());
+            println!(" !!!! Attention: By now, you need to delete the storage folder yourself !!!! ");
+            println!("{}", "-".repeat(120));
+        },
+        None => {},
+    }
     println!("{}", "=".repeat(120));
 
     let mut table = Table::new();

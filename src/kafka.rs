@@ -1,4 +1,5 @@
 use metric::Metrics;
+use metric::LogCompactionKeyMetrics;
 use std::collections::HashMap;
 use std::time::Duration;
 use chrono::prelude::*;
@@ -43,6 +44,7 @@ pub fn get_topic_offsets(consumer: &KafkaConsumer, topic: &str, parts: &mut Vec<
 pub fn read_topic_into_metrics(topic: &str,
                                consumer: &KafkaConsumer,
                                metrics: &mut Metrics,
+                               log_compaction_metrics: &mut Option<LogCompactionKeyMetrics>,
                                partitions: &[i32],
                                end_offsets: &HashMap<i32, i64>) {
     let mut seq: u64 = 0;
@@ -78,19 +80,21 @@ pub fn read_topic_into_metrics(topic: &str,
                 metrics.inc_overall_count();
                 metrics.inc_total(partition);
 
-                match m.key() {
+                let key = match m.key() {
                     Some(k) => {
                         metrics.inc_key_non_null(partition);
                         let k_len = k.len() as u64;
                         message_size += k_len;
                         metrics.inc_key_size_sum(partition, k_len);
                         metrics.inc_overall_size(k_len);
+                        k
                     }
                     None => {
                         empty_key = true;
                         metrics.inc_key_null(partition);
+                        &[]
                     }
-                }
+                };
 
                 match m.payload() {
                     Some(v) => {
@@ -99,10 +103,16 @@ pub fn read_topic_into_metrics(topic: &str,
                         metrics.inc_value_size_sum(partition, v_len);
                         metrics.inc_overall_size(v_len);
                         metrics.inc_alive(partition);
+                        if empty_key == false {
+                            log_compaction_metrics.as_mut().map(|lcm| lcm.mark_key_alive(key));
+                        }
                     }
                     None => {
                         empty_value = true;
                         metrics.inc_tombstones(partition);
+                        if empty_key == false {
+                            log_compaction_metrics.as_mut().map(|lcm| lcm.mark_key_dead(key));
+                        }
                     }
                 }
 
@@ -115,7 +125,7 @@ pub fn read_topic_into_metrics(topic: &str,
                 pb.inc(1);
                 pb.set_message(
                     format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
-                          seq, topic, partition, offset, timestamp).as_str());
+                            seq, topic, partition, offset, timestamp).as_str());
 
                 if let Err(e) = consumer.store_offset(&m) {
                     warn!("Error while storing offset: {}", e);

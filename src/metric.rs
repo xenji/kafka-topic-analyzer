@@ -21,7 +21,6 @@ pub struct LogCompactionKeyMetrics {
     rocks: DB
 }
 
-
 impl Metrics {
     pub fn new(number_of_partitions: i32) -> Metrics {
         let mut mr = MetricRegistry::new();
@@ -205,7 +204,7 @@ impl Metrics {
 }
 
 impl LogCompactionKeyMetrics {
-    fn new(storage_path: &str) -> LogCompactionKeyMetrics {
+    pub fn new(storage_path: &str) -> LogCompactionKeyMetrics {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_compression_type(DBCompressionType::Lz4);
