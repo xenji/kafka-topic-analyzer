@@ -69,7 +69,8 @@ pub fn read_topic_into_metrics(topic: &str,
                 seq += 1;
                 let partition = m.partition();
                 let offset = m.offset();
-                let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0), Utc);
+                let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
+                let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
                 let mut message_size: u64 = 0;
                 let mut empty_key = false;
                 let mut empty_value = false;
