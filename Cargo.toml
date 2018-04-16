@@ -20,6 +20,11 @@ indicatif = "0.9.0"
 [dependencies.rdkafka]
 version = "~0.15"
 
+[features]
+# We re-export the dynamic linking feature here to enable the user of this tool to decide wheter
+# they opt into using the on-the-fly-compilation or dynamic linking.
+# Details: https://github.com/fede1024/rust-rdkafka/#installation
+dynamic_linking = ["rdkafka/dynamic_linking"]
 
 [profile.dev]
 panic               = 'unwind'
