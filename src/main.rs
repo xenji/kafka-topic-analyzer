@@ -10,7 +10,6 @@ extern crate indicatif;
 
 use clap::{App, Arg};
 use std::collections::HashMap;
-use kafka::read_topic_into_metrics;
 use metric::Metrics;
 use std::time::Instant;
 use prettytable::Table;
@@ -59,8 +58,7 @@ fn main() {
     let mut mr = Metrics::new(partitions.len() as i32);
 
     info!("Start processing...");
-    read_topic_into_metrics(topic, &consumer, &mut mr, &partitions, &end_offsets);
-
+    kafka::read_topic_into_metrics(topic, &consumer, &mut mr, &partitions, &end_offsets);
 
     let duration_secs = start_time.elapsed().as_secs();
 
