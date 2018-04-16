@@ -207,3 +207,14 @@ fn test_metrics() {
     assert_eq!(*mr.registry.get("topic.messages.total").unwrap().get(&0).unwrap(), 1u64);
     assert_eq!(*mr.registry.get("topic.messages.total").unwrap().get(&1).unwrap(), 2u64);
 }
+
+#[test]
+fn test_metric_getter() {
+    let mut mr = Metrics::new(10);
+    mr.inc_total(0);
+    mr.inc_total(1);
+    mr.inc_total(1);
+
+    assert_eq!(mr.total(0), 1u64);
+    assert_eq!(mr.total(1), 2u64);
+}
