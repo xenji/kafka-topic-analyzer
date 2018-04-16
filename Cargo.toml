@@ -1,6 +1,6 @@
 [package]
 name = "kafka-topic-analyzer"
-version = "0.2.0"
+version = "0.2.3"
 authors = ["Mario Mueller <mario@xenji.com>"]
 repository = "https://github.com/xenji/kafka-topic-analyzer"
 license = "MIT"
