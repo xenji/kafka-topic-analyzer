@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use chrono::prelude::*;
+use rocksdb::{DB, Options, DBCompressionType, IteratorMode};
 
 type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
@@ -13,8 +14,13 @@ pub struct Metrics {
     smallest_message: u64,
     largest_message: u64,
     overall_size: u64,
-    overall_count: u64
+    overall_count: u64,
 }
+
+pub struct LogCompactionKeyMetrics {
+    rocks: DB
+}
+
 
 impl Metrics {
     pub fn new(number_of_partitions: i32) -> Metrics {
@@ -41,7 +47,7 @@ impl Metrics {
             largest_message: 0,
             smallest_message: <u64>::max_value(),
             overall_size: 0,
-            overall_count: 0
+            overall_count: 0,
         }
     }
 
@@ -67,7 +73,7 @@ impl Metrics {
             self.earliest_message = cmp;
         }
         if self.latest_message.lt(&cmp) {
-            self.latest_message= cmp;
+            self.latest_message = cmp;
         }
     }
 
@@ -195,6 +201,36 @@ impl Metrics {
 
     fn increment(&mut self, key: &str, p: Partition, amount: u64) {
         *self.registry.get_mut(key).unwrap().get_mut(&p).unwrap() += amount;
+    }
+}
+
+impl LogCompactionKeyMetrics {
+    fn new(storage_path: &str) -> LogCompactionKeyMetrics {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.set_compression_type(DBCompressionType::Lz4);
+        LogCompactionKeyMetrics {
+            rocks: DB::open(&opts, storage_path).unwrap()
+        }
+    }
+
+    pub fn mark_key_alive(&mut self, key: &[u8]) {
+        self.rocks.put(key, &[0u8]).unwrap();
+    }
+
+    pub fn mark_key_dead(&mut self, key: &[u8]) {
+        self.rocks.put(key, &[1u8]).unwrap();
+    }
+
+    pub fn sum_all_alive(&self) -> u64 {
+        let mut valid = 0u64;
+        let iter = self.rocks.iterator(IteratorMode::Start);
+        for (_, value) in iter {
+            if value[0] == 1 {
+                valid += 1;
+            }
+        }
+        valid
     }
 }
 

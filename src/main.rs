@@ -7,6 +7,7 @@ extern crate uuid;
 extern crate chrono;
 #[macro_use] extern crate prettytable;
 extern crate indicatif;
+extern crate rocksdb;
 
 use clap::{App, Arg};
 use std::collections::HashMap;
@@ -41,6 +42,13 @@ fn main() {
             .takes_value(true)
             .required(true)
         )
+        .arg(Arg::with_name("count-alive-keys")
+            .short("c")
+            .long("count-alive-keys")
+            .value_name("LOCAL_ALIVE_KEYS_STORAGE_PATH")
+            .help("Counts the effective number of alive keys in a log compacted topic by saving the state for each key in a local file and counting the result at the end of the read operation")
+            .takes_value(true)
+            .required(false))
         .get_matches();
 
     let start_time = Instant::now();
