@@ -9,14 +9,15 @@ extern crate chrono;
 extern crate indicatif;
 extern crate rocksdb;
 
-use clap::{App, Arg};
-use std::collections::HashMap;
+use metric::LogCompactionKeyMetrics;
 use metric::Metrics;
-use std::time::Instant;
 use prettytable::Table;
+use std::time::Instant;
 use prettytable::row::Row;
 use prettytable::cell::Cell;
-use metric::LogCompactionKeyMetrics;
+use clap::{App, Arg};
+use std::collections::HashMap;
+use std::fs;
 
 mod kafka;
 mod metric;
@@ -47,7 +48,9 @@ fn main() {
             .short("c")
             .long("count-alive-keys")
             .value_name("LOCAL_ALIVE_KEYS_STORAGE_PATH")
-            .help("Counts the effective number of alive keys in a log compacted topic by saving the state for each key in a local file and counting the result at the end of the read operation")
+            .help("Counts the effective number of alive keys in a log compacted topic by saving the \
+            state for each key in a local file and counting the result at the end of the read operation.\
+            THIS MUST BE A SEPARATE DIRECTORY, DON'T USE '.'!")
             .takes_value(true)
             .required(false))
         .get_matches();
@@ -94,8 +97,8 @@ fn main() {
         Some(lcm) => {
             println!("{}", "-".repeat(120));
             println!("Alive keys: {}", lcm.sum_all_alive());
-            println!(" !!!! Attention: By now, you need to delete the storage folder yourself !!!! ");
             println!("{}", "-".repeat(120));
+            fs::remove_dir_all(matches.value_of("count-alive-keys").unwrap()).unwrap();
         },
         None => {},
     }

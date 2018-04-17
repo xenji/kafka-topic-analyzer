@@ -205,20 +205,25 @@ impl Metrics {
 
 impl LogCompactionKeyMetrics {
     pub fn new(storage_path: &str) -> LogCompactionKeyMetrics {
+
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_compression_type(DBCompressionType::Lz4);
+        opts.set_compression_type(DBCompressionType::Snappy);
         LogCompactionKeyMetrics {
-            rocks: DB::open(&opts, storage_path).unwrap()
+            rocks: DB::open(&opts, if storage_path != "." {
+                storage_path
+            } else {
+                "./tmp"
+            }).unwrap()
         }
     }
 
     pub fn mark_key_alive(&mut self, key: &[u8]) {
-        self.rocks.put(key, &[0u8]).unwrap();
+        self.rocks.put(key, &[1u8]).unwrap();
     }
 
     pub fn mark_key_dead(&mut self, key: &[u8]) {
-        self.rocks.put(key, &[1u8]).unwrap();
+        self.rocks.put(key, &[0u8]).unwrap();
     }
 
     pub fn sum_all_alive(&self) -> u64 {
