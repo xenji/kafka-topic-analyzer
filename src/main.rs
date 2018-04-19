@@ -17,6 +17,8 @@ use prettytable::row::Row;
 use prettytable::cell::Cell;
 use clap::{App, Arg};
 use metric::Metrics;
+use std::fs;
+use metric::LogCompactionMetrics;
 
 mod kafka;
 mod metric;
@@ -48,8 +50,7 @@ fn main() {
             .long("count-alive-keys")
             .value_name("LOCAL_ALIVE_KEYS_STORAGE_PATH")
             .help("Counts the effective number of alive keys in a log compacted topic by saving the \
-            state for each key in a local file and counting the result at the end of the read operation.\
-            THIS MUST BE A SEPARATE DIRECTORY, DON'T USE '.'!")
+            state for each key in a local file and counting the result at the end of the read operation")
             .takes_value(true)
             .required(false))
         .get_matches();
@@ -57,12 +58,24 @@ fn main() {
     let start_time = Instant::now();
 
     let mut partitions = Vec::<i32>::new();
-    let mut start_offsets = HashMap::<i32, i64>::new();
-    let mut end_offsets = HashMap::<i32, i64>::new();
+    let start_offsets: HashMap<i32, i64>;
+    let end_offsets: HashMap<i32, i64>;
     let topic = matches.value_of("topic").unwrap();
     let bootstrap_server = matches.value_of("bootstrap-server").unwrap();
 
+    let mut log_compaction_metrics = match matches.value_of("count-alive-keys") {
+        Some(v) => {
+            if v == "." {
+                Some(LogCompactionMetrics::new("./tmp"))
+            } else {
+                Some(LogCompactionMetrics::new(v))
+            }
+        }
+        None => None
+    };
+
     let mut metrics = Metrics::new();
+    let mut lcm: LogCompactionMetrics;
     {
         let mut topic_analyzer = kafka::TopicAnalyzer::new_from_bootstrap_servers(bootstrap_server);
         let offsets = topic_analyzer.get_topic_offsets(topic);
@@ -97,17 +110,18 @@ fn main() {
         println!("Largest Message: {} bytes", metrics_cloned.largest_message());
         println!("Smallest Message: {} bytes", metrics_cloned.smallest_message());
         println!("Topic Size: {} bytes", metrics_cloned.overall_size());
-//    match opt_log_compact_tracking {
-//        Some(lcm) => {
-//            println!("{}", "-".repeat(120));
-//            println!("Alive keys: {}", lcm.sum_all_alive());
-//            println!("{}", "-".repeat(120));
-//            fs::remove_dir_all(matches.value_of("count-alive-keys").unwrap()).unwrap();
-//        },
-//        None => {},
-//    }
-        println!("{}", "=".repeat(120));
 
+        match log_compaction_metrics.as_mut() {
+            Some(l) => {
+                println!("{}", "-".repeat(120));
+                println!("Alive keys: {}", l.sum_all_alive());
+                println!("{}", "-".repeat(120));
+                fs::remove_dir_all(matches.value_of("count-alive-keys").unwrap()).unwrap();
+            }
+            None => {}
+        }
+
+        println!("{}", "=".repeat(120));
         let mut table = Table::new();
         table.add_row(row!["P", "|< OS", ">| OS", "Total", "Alive", "Tmb", "DR", "K Null", "K !Null", "P-Bytes", "K-Bytes", "V-Bytes", "A K-Sz", "A V-Sz", "A M-Sz"]);
 

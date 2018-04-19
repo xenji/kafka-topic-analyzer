@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use chrono::prelude::*;
 use rocksdb::{DB, Options, DBCompressionType, IteratorMode};
+
 use kafka::MetricHandler;
 use rdkafka::message::{Message, BorrowedMessage};
 
@@ -19,7 +20,7 @@ pub struct Metrics {
     overall_count: u64,
 }
 
-pub struct LogCompactionKeyMetrics {
+pub struct LogCompactionMetrics {
     rocks: DB
 }
 
@@ -205,7 +206,6 @@ impl Metrics {
 impl MetricHandler for Metrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         let partition = m.partition();
-        let offset = m.offset();
         let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
         let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
         let mut message_size: u64 = 0;
@@ -215,7 +215,7 @@ impl MetricHandler for Metrics {
         self.inc_overall_count();
         self.inc_total(partition);
 
-        let _key = match m.key() {
+        match m.key() {
             Some(k) => {
                 self.inc_key_non_null(partition);
                 let k_len = k.len() as u64;
@@ -253,12 +253,12 @@ impl MetricHandler for Metrics {
     }
 }
 
-impl LogCompactionKeyMetrics {
-    pub fn new(storage_path: &str) -> LogCompactionKeyMetrics {
+impl LogCompactionMetrics {
+    pub fn new(storage_path: &str) -> LogCompactionMetrics {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_compression_type(DBCompressionType::Snappy);
-        LogCompactionKeyMetrics {
+        LogCompactionMetrics {
             rocks: DB::open(&opts, if storage_path != "." {
                 storage_path
             } else {
@@ -284,6 +284,24 @@ impl LogCompactionKeyMetrics {
             }
         }
         valid
+    }
+}
+
+impl MetricHandler for LogCompactionMetrics {
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
+        // No counting for un-keyed topics
+        let key = m.key().as_ref();
+        if key.is_some() {
+            let key = key.unwrap();
+            match m.payload() {
+                Some(_) => {
+                    self.mark_key_alive(key);
+                },
+                None => {
+                    self.mark_key_dead(key);
+                }
+            }
+        }
     }
 }
 

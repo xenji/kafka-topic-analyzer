@@ -1,4 +1,3 @@
-use metric::Metrics;
 use std::collections::HashMap;
 use std::time::Duration;
 use chrono::prelude::*;
