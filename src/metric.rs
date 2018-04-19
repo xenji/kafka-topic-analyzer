@@ -8,7 +8,7 @@ type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
 type MetricRegistry = HashMap<String, PartitionedCounterBucket>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Metrics {
     registry: MetricRegistry,
     earliest_message: DateTime<Utc>,
@@ -215,7 +215,7 @@ impl MetricHandler for Metrics {
         self.inc_overall_count();
         self.inc_total(partition);
 
-        let key = match m.key() {
+        let _key = match m.key() {
             Some(k) => {
                 self.inc_key_non_null(partition);
                 let k_len = k.len() as u64;

@@ -13,11 +13,11 @@ pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
 pub struct TopicAnalyzer<'a> {
     consumer: KafkaConsumer,
-    metric_handlers: Vec<&'a MetricHandler>,
+    metric_handlers: Vec<&'a mut MetricHandler>,
 }
 
 pub trait MetricHandler {
-    fn handle_message<'b>(&self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
 }
 
 impl <'a> TopicAnalyzer<'a> {
@@ -42,7 +42,7 @@ impl <'a> TopicAnalyzer<'a> {
         }
     }
 
-    pub fn add_metric_handler(&mut self, handler: &'a MetricHandler) {
+    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler) {
         self.metric_handlers.push(handler);
     }
 
