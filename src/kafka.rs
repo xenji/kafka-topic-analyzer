@@ -1,5 +1,4 @@
 use metric::Metrics;
-use metric::LogCompactionKeyMetrics;
 use std::collections::HashMap;
 use std::time::Duration;
 use chrono::prelude::*;
@@ -7,144 +6,125 @@ use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle};
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
-use rdkafka::message::Message;
+use rdkafka::message::{Message, BorrowedMessage};
 use uuid::Uuid;
 
 pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
-pub fn create_client(bootstrap_server: &str) -> KafkaConsumer {
-    ClientConfig::new()
-        .set("group.id", format!("topic-analyzer--{}-{}", env!("USER"), Uuid::new_v4()).as_str())
-        .set("bootstrap.servers", bootstrap_server)
-        .set("enable.partition.eof", "false")
-        .set("auto.offset.reset", "earliest")
-        .set("enable.auto.commit", "false")
-        .set("api.version.request", "true")
-        .set("enable.auto.offset.store", "false")
-        .set("client.id", "topic-analyzer")
-        .set("queue.buffering.max.ms", "1000")
-
-        .set_log_level(RDKafkaLogLevel::Info)
-        .create()
-        .expect("Consumer creation failed")
+pub struct TopicAnalyzer<'a, 'b> {
+    consumer: KafkaConsumer,
+    metrics: Metrics,
+    metric_handlers: Vec<&'a mut MetricHandler<'b>>,
 }
 
-pub fn get_topic_offsets(consumer: &KafkaConsumer, topic: &str, parts: &mut Vec<i32>, start_offsets: &mut HashMap<i32, i64>, end_offsets: &mut HashMap<i32, i64>) {
-    let md = consumer.fetch_metadata(Option::from(topic), Duration::new(10, 0)).unwrap_or_else(|e| { panic!("Error fetching metadata: {}", e) });
-    let topic_metadata = md.topics().first().unwrap_or_else(|| { panic!("Topic not found!") });
-
-    for partition in topic_metadata.partitions() {
-        parts.push(partition.id());
-        let (low, high) = consumer.fetch_watermarks(topic, partition.id(), Duration::new(1, 0)).unwrap();
-        start_offsets.insert(partition.id(), low);
-        end_offsets.insert(partition.id(), high);
-    }
+pub trait MetricHandler<'b> {
+    fn handle_message(&mut self, m: &BorrowedMessage<'b>)
+        where BorrowedMessage<'b>: Message;
 }
 
-pub fn read_topic_into_metrics(topic: &str,
-                               consumer: &KafkaConsumer,
-                               metrics: &mut Metrics,
-                               log_compaction_metrics: &mut Option<LogCompactionKeyMetrics>,
-                               partitions: &[i32],
-                               end_offsets: &HashMap<i32, i64>) {
-    let mut seq: u64 = 0;
-    let mut still_running = HashMap::<i32, bool>::new();
-    for &p in partitions {
-        still_running.insert(p, true);
+impl <'a, 'b> TopicAnalyzer<'a, 'b> {
+    pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a, 'b> {
+        TopicAnalyzer {
+            metrics: Metrics::new(),
+            consumer: ClientConfig::new()
+                // we use ENV["USER"] to make the analyzer identify-able. It can emit quite a lot of load
+                // on the cluster, so you might want to see who this is.
+                .set("group.id", format!("topic-analyzer--{}-{}", env!("USER"), Uuid::new_v4()).as_str())
+                .set("bootstrap.servers", bootstrap_server)
+                .set("enable.partition.eof", "false")
+                .set("auto.offset.reset", "earliest")
+                .set("enable.auto.commit", "false")
+                .set("api.version.request", "true")
+                .set("enable.auto.offset.store", "false")
+                .set("client.id", "topic-analyzer")
+                .set("queue.buffering.max.ms", "1000")
+                .set_log_level(RDKafkaLogLevel::Info)
+                .create()
+                .expect("Consumer creation failed"),
+            metric_handlers: vec![],
+        }
     }
 
-    println!("Subscribing to {}", topic);
-    consumer.subscribe(&[topic]).expect("Can't subscribe to specified topic");
+    pub fn metrics(&self) -> &Metrics {
+        &self.metrics
+    }
 
-    println!("Starting message consumption...");
-    let sty = ProgressStyle::default_spinner().template("{spinner} [{elapsed_precise}] {msg}");
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(sty.clone());
+    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler<'b>) {
+        self.metric_handlers.push(handler);
+    }
 
-    loop {
-        match consumer.poll(Duration::from_millis(100)) {
-            None => {}
-            Some(Err(e)) => {
-                warn!("Kafka error: {}", e);
-            }
-            Some(Ok(m)) => {
-                seq += 1;
-                let partition = m.partition();
-                let offset = m.offset();
-                let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
-                let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
-                let mut message_size: u64 = 0;
-                let mut empty_key = false;
-                let mut empty_value = false;
+    pub fn get_topic_offsets(&self, topic: &str) -> (HashMap<i32, i64>, HashMap<i32, i64>) {
+        let md = self.consumer.fetch_metadata(Option::from(topic), Duration::new(10, 0)).unwrap_or_else(|e| { panic!("Error fetching metadata: {}", e) });
+        let topic_metadata = md.topics().first().unwrap_or_else(|| { panic!("Topic not found!") });
 
-                metrics.inc_overall_count();
-                metrics.inc_total(partition);
+        let mut start_offsets = HashMap::<i32, i64>::new();
+        let mut end_offsets = HashMap::<i32, i64>::new();
+        for partition in topic_metadata.partitions() {
+            let (low, high) = self.consumer.fetch_watermarks(topic, partition.id(), Duration::new(1, 0)).unwrap();
+            start_offsets.insert(partition.id(), low);
+            end_offsets.insert(partition.id(), high);
+        }
+        (start_offsets, end_offsets)
+    }
 
-                let key = match m.key() {
-                    Some(k) => {
-                        metrics.inc_key_non_null(partition);
-                        let k_len = k.len() as u64;
-                        message_size += k_len;
-                        metrics.inc_key_size_sum(partition, k_len);
-                        metrics.inc_overall_size(k_len);
-                        k
+    pub fn read_topic_into_metrics(&mut self,
+                                   topic: &str,
+                                   end_offsets: &HashMap<i32, i64>) {
+        let mut seq: u64 = 0;
+        let mut still_running = HashMap::<i32, bool>::new();
+        for &p in end_offsets.keys() {
+            still_running.insert(p, true);
+        }
+
+        println!("Subscribing to {}", topic);
+        self.consumer.subscribe(&[topic]).expect("Can't subscribe to specified topic");
+
+        println!("Starting message consumption...");
+        let sty = ProgressStyle::default_spinner().template("{spinner} [{elapsed_precise}] {msg}");
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(sty.clone());
+
+        loop {
+            match self.consumer.poll(Duration::from_millis(100)) {
+                None => {}
+                Some(Err(e)) => {
+                    warn!("Kafka error: {}", e);
+                }
+                Some(Ok(m)) => {
+                    seq += 1;
+                    let partition = m.partition();
+                    let offset = m.offset();
+                    let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
+                    let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
+
+                    for mut mh in self.metric_handlers {
+                        mh.handle_message(&m);
                     }
-                    None => {
-                        empty_key = true;
-                        metrics.inc_key_null(partition);
-                        &[]
-                    }
-                };
 
-                match m.payload() {
-                    Some(v) => {
-                        let v_len = v.len() as u64;
-                        message_size += v_len;
-                        metrics.inc_value_size_sum(partition, v_len);
-                        metrics.inc_overall_size(v_len);
-                        metrics.inc_alive(partition);
-                        if empty_key == false {
-                            log_compaction_metrics.as_mut().map(|lcm| lcm.mark_key_alive(key));
+                    pb.inc(1);
+                    pb.set_message(
+                        format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
+                                seq, topic, partition, offset, timestamp).as_str());
+
+                    if let Err(e) = self.consumer.store_offset(&m) {
+                        warn!("Error while storing offset: {}", e);
+                    }
+
+                    if (offset + 1) >= *end_offsets.get(&partition).unwrap() {
+                        *still_running.get_mut(&partition).unwrap() = false;
+                    }
+
+                    let mut all_done = true;
+                    for running in still_running.values() {
+                        if *running {
+                            all_done = false;
                         }
                     }
-                    None => {
-                        empty_value = true;
-                        metrics.inc_tombstones(partition);
-                        if empty_key == false {
-                            log_compaction_metrics.as_mut().map(|lcm| lcm.mark_key_dead(key));
-                        }
+
+                    if all_done {
+                        pb.finish_with_message("done");
+                        break;
                     }
-                }
-
-                metrics.cmp_and_set_message_timestamp(timestamp);
-
-                if !empty_key && !empty_value {
-                    metrics.cmp_and_set_message_size(message_size);
-                }
-
-                pb.inc(1);
-                pb.set_message(
-                    format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
-                            seq, topic, partition, offset, timestamp).as_str());
-
-                if let Err(e) = consumer.store_offset(&m) {
-                    warn!("Error while storing offset: {}", e);
-                }
-
-                if (offset + 1) >= *end_offsets.get(&partition).unwrap() {
-                    *still_running.get_mut(&partition).unwrap() = false;
-                }
-
-                let mut all_done = true;
-                for running in still_running.values() {
-                    if *running {
-                        all_done = false;
-                    }
-                }
-
-                if all_done {
-                    pb.finish_with_message("done");
-                    break;
                 }
             }
         }

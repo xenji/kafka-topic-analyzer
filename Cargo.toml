@@ -16,46 +16,14 @@ prettytable-rs = "~0.6"
 uuid = { version = "~0.6", features = ["v4"] }
 chrono = "~0.4"
 indicatif = "0.9.0"
-rocksdb = "~0.10"
 rdkafka = "~0.15"
+rocksdb = { version = "~0.10", optional = true }
 
 [features]
+default = ["rocksdb"]
+log_compaction_tracking = ["rocksdb"]
+
 # We re-export the dynamic linking feature here to enable the user of this tool to decide wheter
 # they opt into using the on-the-fly-compilation or dynamic linking.
 # Details: https://github.com/fede1024/rust-rdkafka/#installation
 dynamic_linking = ["rdkafka/dynamic_linking"]
-
-[profile.dev]
-panic               = 'unwind'
-codegen-units       = 2
-debug               = true
-debug-assertions    = true
-lto                 = false
-opt-level           = 0
-rpath               = false
-
-[profile.release]
-codegen-units       = 1
-debug               = false
-debug-assertions    = false
-lto                 = true
-opt-level           = 3
-rpath               = false
-
-[profile.test]
-opt-level           = 0
-debug               = true
-rpath               = false
-lto                 = false
-debug-assertions    = true
-codegen-units       = 1
-panic               = 'unwind'
-
-[profile.bench]
-opt-level           = 0
-debug               = true
-rpath               = false
-lto                 = false
-debug-assertions    = false
-codegen-units       = 1
-panic               = 'unwind'
