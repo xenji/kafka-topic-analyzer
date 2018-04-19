@@ -11,19 +11,18 @@ use uuid::Uuid;
 
 pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
-pub struct TopicAnalyzer<'a, 'b> {
+pub struct TopicAnalyzer<'a> {
     consumer: KafkaConsumer,
     metrics: Metrics,
-    metric_handlers: Vec<&'a mut MetricHandler<'b>>,
+    metric_handlers: Vec<&'a mut MetricHandler>,
 }
 
-pub trait MetricHandler<'b> {
-    fn handle_message(&mut self, m: &BorrowedMessage<'b>)
-        where BorrowedMessage<'b>: Message;
+pub trait MetricHandler {
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
 }
 
-impl <'a, 'b> TopicAnalyzer<'a, 'b> {
-    pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a, 'b> {
+impl <'a> TopicAnalyzer<'a> {
+    pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a> {
         TopicAnalyzer {
             metrics: Metrics::new(),
             consumer: ClientConfig::new()
@@ -49,7 +48,7 @@ impl <'a, 'b> TopicAnalyzer<'a, 'b> {
         &self.metrics
     }
 
-    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler<'b>) {
+    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler) {
         self.metric_handlers.push(handler);
     }
 
@@ -97,7 +96,7 @@ impl <'a, 'b> TopicAnalyzer<'a, 'b> {
                     let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
                     let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
 
-                    for mut mh in self.metric_handlers {
+                    for mh in self.metric_handlers.iter_mut() {
                         mh.handle_message(&m);
                     }
 

@@ -202,8 +202,8 @@ impl Metrics {
     }
 }
 
-impl<'a> MetricHandler<'a> for Metrics {
-    fn handle_message(&mut self, m: &BorrowedMessage<'a>) where BorrowedMessage<'a>: Message {
+impl MetricHandler for Metrics {
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         let partition = m.partition();
         let offset = m.offset();
         let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
