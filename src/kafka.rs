@@ -13,18 +13,16 @@ pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
 pub struct TopicAnalyzer<'a> {
     consumer: KafkaConsumer,
-    metrics: Metrics,
-    metric_handlers: Vec<&'a mut MetricHandler>,
+    metric_handlers: Vec<&'a MetricHandler>,
 }
 
 pub trait MetricHandler {
-    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
+    fn handle_message<'b>(&self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
 }
 
 impl <'a> TopicAnalyzer<'a> {
     pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a> {
         TopicAnalyzer {
-            metrics: Metrics::new(),
             consumer: ClientConfig::new()
                 // we use ENV["USER"] to make the analyzer identify-able. It can emit quite a lot of load
                 // on the cluster, so you might want to see who this is.
@@ -44,11 +42,7 @@ impl <'a> TopicAnalyzer<'a> {
         }
     }
 
-    pub fn metrics(&self) -> &Metrics {
-        &self.metrics
-    }
-
-    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler) {
+    pub fn add_metric_handler(&mut self, handler: &'a MetricHandler) {
         self.metric_handlers.push(handler);
     }
 
