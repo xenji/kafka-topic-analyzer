@@ -1,6 +1,6 @@
 [package]
 name = "kafka-topic-analyzer"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Mario Mueller <mario@xenji.com>"]
 repository = "https://github.com/xenji/kafka-topic-analyzer"
 license = "MIT"
@@ -17,12 +17,9 @@ uuid = { version = "~0.6", features = ["v4"] }
 chrono = "~0.4"
 indicatif = "0.9.0"
 rdkafka = "~0.15"
-rocksdb = { version = "~0.10", optional = true }
+rocksdb = "~0.10"
 
 [features]
-default = ["rocksdb"]
-log_compaction_tracking = ["rocksdb"]
-
 # We re-export the dynamic linking feature here to enable the user of this tool to decide wheter
 # they opt into using the on-the-fly-compilation or dynamic linking.
 # Details: https://github.com/fede1024/rust-rdkafka/#installation
