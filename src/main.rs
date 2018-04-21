@@ -95,7 +95,7 @@ fn main() {
             None => {}
         }
 
-        topic_analyzer.read_topic_into_metrics(topic, &start_offsets, &end_offsets);
+        topic_analyzer.read_topic_into_metrics(topic, &end_offsets);
     }
 
 

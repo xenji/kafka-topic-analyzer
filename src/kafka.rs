@@ -7,8 +7,6 @@ use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
 use rdkafka::message::{Message, BorrowedMessage};
 use uuid::Uuid;
-use indicatif::MultiProgress;
-use indicatif::ProgressDrawTarget;
 
 pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
@@ -21,7 +19,7 @@ pub trait MetricHandler {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message;
 }
 
-impl <'a> TopicAnalyzer<'a> {
+impl<'a> TopicAnalyzer<'a> {
     pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a> {
         TopicAnalyzer {
             consumer: ClientConfig::new()
@@ -63,37 +61,22 @@ impl <'a> TopicAnalyzer<'a> {
 
     pub fn read_topic_into_metrics(&mut self,
                                    topic: &str,
-                                   start_offsets: &HashMap<i32, i64>,
                                    end_offsets: &HashMap<i32, i64>) {
         let mut seq: u64 = 0;
         let mut still_running = HashMap::<i32, bool>::new();
+
         for &p in end_offsets.keys() {
             still_running.insert(p, true);
         }
+
+
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(ProgressStyle::default_spinner().template("{spinner:.green} [{elapsed_precise}] {msg}"));
 
         println!("Subscribing to {}", topic);
         self.consumer.subscribe(&[topic]).expect("Can't subscribe to specified topic");
 
         println!("Starting message consumption...");
-
-        let m = MultiProgress::new();
-        let sty = ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
-            .progress_chars("##-");
-
-        let mut progress_bars = HashMap::<i32, ProgressBar>::new();
-
-        for p in start_offsets.keys() {
-
-            let start = start_offsets[p] as u64;
-            let end = end_offsets[p] as u64;
-
-            let pb = m.add(ProgressBar::new(end - start));
-            pb.set_style(sty.clone());
-            pb.tick();
-            progress_bars.insert(*p, pb);
-        }
-
         loop {
             match self.consumer.poll(Duration::from_millis(100)) {
                 None => {}
@@ -104,6 +87,8 @@ impl <'a> TopicAnalyzer<'a> {
                     seq += 1;
                     let partition = m.partition();
                     let offset = m.offset();
+
+
                     let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
                     let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
 
@@ -111,8 +96,7 @@ impl <'a> TopicAnalyzer<'a> {
                         mh.handle_message(&m);
                     }
 
-                    progress_bars[&partition].set_position(offset as u64);
-                    progress_bars[&partition].set_message(
+                    pb.set_message(
                         format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
                                 seq, topic, partition, offset, timestamp).as_str());
 
@@ -122,7 +106,6 @@ impl <'a> TopicAnalyzer<'a> {
 
                     if (offset + 1) >= *end_offsets.get(&partition).unwrap() {
                         *still_running.get_mut(&partition).unwrap() = false;
-                        progress_bars[&partition].finish_with_message("done");
                     }
 
                     let mut all_done = true;
@@ -138,6 +121,6 @@ impl <'a> TopicAnalyzer<'a> {
                 }
             }
         }
-        m.join_and_clear().unwrap();
+        pb.finish_with_message("done");
     }
 }
