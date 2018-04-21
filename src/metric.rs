@@ -290,17 +290,18 @@ impl LogCompactionMetrics {
 impl MetricHandler for LogCompactionMetrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         // No counting for un-keyed topics
-        let key = m.key().as_ref();
-        if key.is_some() {
-            let key = key.unwrap();
-            match m.payload() {
-                Some(_) => {
-                    self.mark_key_alive(key);
-                },
-                None => {
-                    self.mark_key_dead(key);
+        match m.key() {
+            Some(k) => {
+                match m.payload() {
+                    Some(_) => {
+                        self.mark_key_alive(k);
+                    },
+                    None => {
+                        self.mark_key_dead(k);
+                    }
                 }
             }
+            None => {}
         }
     }
 }

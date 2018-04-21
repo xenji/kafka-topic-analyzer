@@ -75,7 +75,6 @@ fn main() {
     };
 
     let mut metrics = Metrics::new();
-    let mut lcm: LogCompactionMetrics;
     {
         let mut topic_analyzer = kafka::TopicAnalyzer::new_from_bootstrap_servers(bootstrap_server);
         let offsets = topic_analyzer.get_topic_offsets(topic);
@@ -85,10 +84,17 @@ fn main() {
         for v in start_offsets.keys() {
             partitions.push(*v);
         }
-
         partitions.sort();
 
         topic_analyzer.add_metric_handler(&mut metrics);
+
+        match log_compaction_metrics.as_mut() {
+            Some(l) => {
+                topic_analyzer.add_metric_handler(l);
+            },
+            None => {}
+        }
+
         topic_analyzer.read_topic_into_metrics(topic, &end_offsets);
     }
 
@@ -111,7 +117,7 @@ fn main() {
         println!("Smallest Message: {} bytes", metrics_cloned.smallest_message());
         println!("Topic Size: {} bytes", metrics_cloned.overall_size());
 
-        match log_compaction_metrics.as_mut() {
+        match log_compaction_metrics {
             Some(l) => {
                 println!("{}", "-".repeat(120));
                 println!("Alive keys: {}", l.sum_all_alive());
