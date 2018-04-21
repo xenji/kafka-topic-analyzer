@@ -8,14 +8,20 @@ RUN apt-get update && \
     libc6-dev \
     make \
     pkg-config \
-    libclang-dev
+    libclang-dev \
+    clang \
+    libgflags-dev \
+    libsnappy-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblz4-dev \
+    libzstd-dev \
+    build-essential \
+    g++ \
+    gcc
 
 COPY xargo.sh /
 RUN bash /xargo.sh
-
-COPY cmake.sh /
-RUN apt-get purge --auto-remove -y cmake && \
-    bash /cmake.sh 2.8.11
 
 COPY openssl.sh /
 RUN apt-get install -y --no-install-recommends \
