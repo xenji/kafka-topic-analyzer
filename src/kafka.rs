@@ -7,6 +7,8 @@ use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
 use rdkafka::message::{Message, BorrowedMessage};
 use uuid::Uuid;
+use indicatif::MultiProgress;
+use indicatif::ProgressDrawTarget;
 
 pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
@@ -61,6 +63,7 @@ impl <'a> TopicAnalyzer<'a> {
 
     pub fn read_topic_into_metrics(&mut self,
                                    topic: &str,
+                                   start_offsets: &HashMap<i32, i64>,
                                    end_offsets: &HashMap<i32, i64>) {
         let mut seq: u64 = 0;
         let mut still_running = HashMap::<i32, bool>::new();
@@ -72,9 +75,24 @@ impl <'a> TopicAnalyzer<'a> {
         self.consumer.subscribe(&[topic]).expect("Can't subscribe to specified topic");
 
         println!("Starting message consumption...");
-        let sty = ProgressStyle::default_spinner().template("{spinner} [{elapsed_precise}] {msg}");
-        let pb = ProgressBar::new_spinner();
-        pb.set_style(sty.clone());
+
+        let m = MultiProgress::new();
+        let sty = ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+            .progress_chars("##-");
+
+        let mut progress_bars = HashMap::<i32, ProgressBar>::new();
+
+        for p in start_offsets.keys() {
+
+            let start = start_offsets[p] as u64;
+            let end = end_offsets[p] as u64;
+
+            let pb = m.add(ProgressBar::new(end - start));
+            pb.set_style(sty.clone());
+            pb.tick();
+            progress_bars.insert(*p, pb);
+        }
 
         loop {
             match self.consumer.poll(Duration::from_millis(100)) {
@@ -93,8 +111,8 @@ impl <'a> TopicAnalyzer<'a> {
                         mh.handle_message(&m);
                     }
 
-                    pb.inc(1);
-                    pb.set_message(
+                    progress_bars[&partition].set_position(offset as u64);
+                    progress_bars[&partition].set_message(
                         format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
                                 seq, topic, partition, offset, timestamp).as_str());
 
@@ -104,6 +122,7 @@ impl <'a> TopicAnalyzer<'a> {
 
                     if (offset + 1) >= *end_offsets.get(&partition).unwrap() {
                         *still_running.get_mut(&partition).unwrap() = false;
+                        progress_bars[&partition].finish_with_message("done");
                     }
 
                     let mut all_done = true;
@@ -114,11 +133,11 @@ impl <'a> TopicAnalyzer<'a> {
                     }
 
                     if all_done {
-                        pb.finish_with_message("done");
                         break;
                     }
                 }
             }
         }
+        m.join_and_clear().unwrap();
     }
 }
