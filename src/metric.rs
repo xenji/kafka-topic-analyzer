@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use chrono::prelude::*;
+use rocksdb::{DB, Options, DBCompressionType, IteratorMode};
+
+use kafka::MetricHandler;
+use rdkafka::message::{Message, BorrowedMessage};
 
 type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
 type MetricRegistry = HashMap<String, PartitionedCounterBucket>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Metrics {
     registry: MetricRegistry,
     earliest_message: DateTime<Utc>,
@@ -13,11 +17,15 @@ pub struct Metrics {
     smallest_message: u64,
     largest_message: u64,
     overall_size: u64,
-    overall_count: u64
+    overall_count: u64,
+}
+
+pub struct LogCompactionMetrics {
+    rocks: DB
 }
 
 impl Metrics {
-    pub fn new(number_of_partitions: i32) -> Metrics {
+    pub fn new() -> Metrics {
         let mut mr = MetricRegistry::new();
         let keys = vec![
             "topic.messages.total",
@@ -28,11 +36,7 @@ impl Metrics {
             "topic.messages.key-size.sum",
             "topic.messages.value-size.sum"];
         for key in keys {
-            let mut pcb = PartitionedCounterBucket::new();
-            for i in 0..number_of_partitions {
-                pcb.insert(i, 0u64);
-            }
-            mr.insert(String::from(key), pcb);
+            mr.insert(String::from(key), PartitionedCounterBucket::new());
         }
         Metrics {
             registry: mr,
@@ -41,7 +45,7 @@ impl Metrics {
             largest_message: 0,
             smallest_message: <u64>::max_value(),
             overall_size: 0,
-            overall_count: 0
+            overall_count: 0,
         }
     }
 
@@ -67,7 +71,7 @@ impl Metrics {
             self.earliest_message = cmp;
         }
         if self.latest_message.lt(&cmp) {
-            self.latest_message= cmp;
+            self.latest_message = cmp;
         }
     }
 
@@ -98,6 +102,7 @@ impl Metrics {
     pub fn inc_value_size_sum(&mut self, p: Partition, amount: u64) {
         self.increment("topic.messages.value-size.sum", p, amount);
     }
+
     ////////////////////////////////////////////////////////////////
 
     pub fn total(&self, p: Partition) -> u64 {
@@ -194,13 +199,116 @@ impl Metrics {
     }
 
     fn increment(&mut self, key: &str, p: Partition, amount: u64) {
-        *self.registry.get_mut(key).unwrap().get_mut(&p).unwrap() += amount;
+        *self.registry.get_mut(key).unwrap().entry(p).or_insert(0u64) += amount;
+    }
+}
+
+impl MetricHandler for Metrics {
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
+        let partition = m.partition();
+        let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
+        let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
+        let mut message_size: u64 = 0;
+        let mut empty_key = false;
+        let mut empty_value = false;
+
+        self.inc_overall_count();
+        self.inc_total(partition);
+
+        match m.key() {
+            Some(k) => {
+                self.inc_key_non_null(partition);
+                let k_len = k.len() as u64;
+                message_size += k_len;
+                self.inc_key_size_sum(partition, k_len);
+                self.inc_overall_size(k_len);
+                k
+            }
+            None => {
+                empty_key = true;
+                self.inc_key_null(partition);
+                &[]
+            }
+        };
+
+        match m.payload() {
+            Some(v) => {
+                let v_len = v.len() as u64;
+                message_size += v_len;
+                self.inc_value_size_sum(partition, v_len);
+                self.inc_overall_size(v_len);
+                self.inc_alive(partition);
+            }
+            None => {
+                empty_value = true;
+                self.inc_tombstones(partition);
+            }
+        }
+
+        self.cmp_and_set_message_timestamp(timestamp);
+
+        if !empty_key && !empty_value {
+            self.cmp_and_set_message_size(message_size);
+        }
+    }
+}
+
+impl LogCompactionMetrics {
+    pub fn new(storage_path: &str) -> LogCompactionMetrics {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.set_compression_type(DBCompressionType::Snappy);
+        LogCompactionMetrics {
+            rocks: DB::open(&opts, if storage_path != "." {
+                storage_path
+            } else {
+                "./tmp"
+            }).unwrap()
+        }
+    }
+
+    pub fn mark_key_alive(&mut self, key: &[u8]) {
+        self.rocks.put(key, &[1u8]).unwrap();
+    }
+
+    pub fn mark_key_dead(&mut self, key: &[u8]) {
+        self.rocks.put(key, &[0u8]).unwrap();
+    }
+
+    pub fn sum_all_alive(&self) -> u64 {
+        let mut valid = 0u64;
+        let iter = self.rocks.iterator(IteratorMode::Start);
+        for (_, value) in iter {
+            if value[0] == 1 {
+                valid += 1;
+            }
+        }
+        valid
+    }
+}
+
+impl MetricHandler for LogCompactionMetrics {
+    fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
+        // No counting for un-keyed topics
+        match m.key() {
+            Some(k) => {
+                match m.payload() {
+                    Some(_) => {
+                        self.mark_key_alive(k);
+                    },
+                    None => {
+                        self.mark_key_dead(k);
+                    }
+                }
+            }
+            None => {}
+        }
     }
 }
 
 #[test]
 fn test_metrics() {
-    let mut mr = Metrics::new(10);
+    let mut mr = Metrics::new();
     mr.inc_total(0);
     mr.inc_total(1);
     mr.inc_total(1);
@@ -210,7 +318,7 @@ fn test_metrics() {
 
 #[test]
 fn test_metric_getter() {
-    let mut mr = Metrics::new(10);
+    let mut mr = Metrics::new();
     mr.inc_total(0);
     mr.inc_total(1);
     mr.inc_total(1);

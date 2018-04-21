@@ -32,7 +32,7 @@ have the rust toolchain installed via [http://rustup.rs/](http://rustup.rs/).
 
 ### Dependencies
 
-### librdkafka
+#### librdkafka
 When installed from source, the binary can build librdkafka as part of the
 dependency resolution process. Please see the [rdkafka-rust dependency documentation](https://github.com/fede1024/rust-rdkafka/#installation)
 for the detailed requirements.
@@ -42,3 +42,7 @@ dynamic linking of the librdkafa dependency.
 
 You can compile this project with `cargo build --features "dynamic_linking"`
 in order to use the shared library instead of building it with the dependencies.
+
+#### rocksdb
+In order to support the active key counting feature, this tool builds
+against [RocksDB](https://github.com/spacejam/rust-rocksdb/).
