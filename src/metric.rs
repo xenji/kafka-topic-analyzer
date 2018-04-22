@@ -7,11 +7,16 @@ use rdkafka::message::{Message, BorrowedMessage};
 
 type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
-type MetricRegistry = HashMap<String, PartitionedCounterBucket>;
 
 #[derive(Debug, Clone)]
 pub struct Metrics {
-    registry: MetricRegistry,
+    total_messages: PartitionedCounterBucket,
+    tombstones: PartitionedCounterBucket,
+    alive: PartitionedCounterBucket,
+    key_null: PartitionedCounterBucket,
+    key_non_null: PartitionedCounterBucket,
+    key_size_sum: PartitionedCounterBucket,
+    value_size_sum: PartitionedCounterBucket,
     earliest_message: DateTime<Utc>,
     latest_message: DateTime<Utc>,
     smallest_message: u64,
@@ -26,20 +31,14 @@ pub struct LogCompactionMetrics {
 
 impl Metrics {
     pub fn new() -> Metrics {
-        let mut mr = MetricRegistry::new();
-        let keys = vec![
-            "topic.messages.total",
-            "topic.messages.tombstones",
-            "topic.messages.alive",
-            "topic.messages.key.null",
-            "topic.messages.key.non-null",
-            "topic.messages.key-size.sum",
-            "topic.messages.value-size.sum"];
-        for key in keys {
-            mr.insert(String::from(key), PartitionedCounterBucket::new());
-        }
         Metrics {
-            registry: mr,
+            total_messages: PartitionedCounterBucket::new(),
+            tombstones: PartitionedCounterBucket::new(),
+            alive: PartitionedCounterBucket::new(),
+            key_null: PartitionedCounterBucket::new(),
+            key_non_null: PartitionedCounterBucket::new(),
+            key_size_sum: PartitionedCounterBucket::new(),
+            value_size_sum: PartitionedCounterBucket::new(),
             earliest_message: Utc::now(),
             latest_message: DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
             largest_message: 0,
@@ -76,61 +75,61 @@ impl Metrics {
     }
 
     pub fn inc_total(&mut self, p: Partition) {
-        self.increment("topic.messages.total", p, 1);
+        self.increment(&mut self.total_messages, p, 1);
     }
 
     pub fn inc_tombstones(&mut self, p: Partition) {
-        self.increment("topic.messages.tombstones", p, 1);
+        self.increment(&mut self.tombstones, p, 1);
     }
 
     pub fn inc_alive(&mut self, p: Partition) {
-        self.increment("topic.messages.alive", p, 1);
+        self.increment(&mut self.alive, p, 1);
     }
 
     pub fn inc_key_null(&mut self, p: Partition) {
-        self.increment("topic.messages.key.null", p, 1);
+        self.increment(&mut self.key_null, p, 1);
     }
 
     pub fn inc_key_non_null(&mut self, p: Partition) {
-        self.increment("topic.messages.key.non-null", p, 1);
+        self.increment(&mut self.key_non_null, p, 1);
     }
 
     pub fn inc_key_size_sum(&mut self, p: Partition, amount: u64) {
-        self.increment("topic.messages.key-size.sum", p, amount);
+        self.increment(&mut self.key_size_sum, p, amount);
     }
 
     pub fn inc_value_size_sum(&mut self, p: Partition, amount: u64) {
-        self.increment("topic.messages.value-size.sum", p, amount);
+        self.increment(&mut self.value_size_sum, p, amount);
     }
 
     ////////////////////////////////////////////////////////////////
 
     pub fn total(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.total", p)
+        self.metric(&self.total_messages, p)
     }
 
     pub fn tombstones(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.tombstones", p)
+        self.metric(&self.tombstones, p)
     }
 
     pub fn alive(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.alive", p)
+        self.metric(&self.alive, p)
     }
 
     pub fn key_null(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.key.null", p)
+        self.metric(&self.key_null, p)
     }
 
     pub fn key_non_null(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.key.non-null", p)
+        self.metric(&self.key_non_null, p)
     }
 
     pub fn key_size_sum(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.key-size.sum", p)
+        self.metric(&self.key_size_sum, p)
     }
 
     pub fn value_size_sum(&self, p: Partition) -> u64 {
-        self.metric("topic.messages.value-size.sum", p)
+        self.metric(&self.value_size_sum, p)
     }
 
     pub fn key_size_avg(&self, p: Partition) -> u64 {
@@ -194,12 +193,12 @@ impl Metrics {
         self.overall_size
     }
 
-    fn metric(&self, key: &str, p: Partition) -> u64 {
-        self.registry[key][&p]
+    fn metric(&self, bucket: &PartitionedCounterBucket, p: Partition) -> u64 {
+        bucket[&p]
     }
 
-    fn increment(&mut self, key: &str, p: Partition, amount: u64) {
-        *self.registry.get_mut(key).unwrap().entry(p).or_insert(0u64) += amount;
+    fn increment(&mut self, bucket: &mut PartitionedCounterBucket, p: Partition, amount: u64) {
+        *bucket.entry(p).or_insert(0u64) += amount;
     }
 }
 
