@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use chrono::prelude::*;
 use rocksdb::{DB, Options, DBCompressionType, IteratorMode};
 
@@ -193,6 +194,7 @@ impl Metrics {
         self.overall_size
     }
 
+    #[inline]
     fn metric(&self, bucket: &PartitionedCounterBucket, p: Partition) -> u64 {
         bucket[&p]
     }
@@ -298,5 +300,13 @@ impl MetricHandler for LogCompactionMetrics {
             }
             None => {}
         }
+    }
+}
+
+impl Drop for LogCompactionMetrics {
+    #[allow(unused_must_use)]
+    fn drop(&mut self) {
+        let path = self.rocks.path();
+        fs::remove_dir_all(path);
     }
 }
