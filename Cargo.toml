@@ -10,7 +10,7 @@ description = "An analyzer for getting metrics about the contents of a Apache Ka
 
 [dependencies]
 clap = "~2.29"
-env_logger = "~0.4"
+env_logger = "~0.5"
 log = "~0.4"
 prettytable-rs = "~0.6"
 uuid = { version = "~0.6", features = ["v4"] }

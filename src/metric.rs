@@ -75,31 +75,31 @@ impl Metrics {
     }
 
     pub fn inc_total(&mut self, p: Partition) {
-        self.increment(&mut self.total_messages, p, 1);
+        *self.total_messages.entry(p).or_insert(0u64) += 1;
     }
 
     pub fn inc_tombstones(&mut self, p: Partition) {
-        self.increment(&mut self.tombstones, p, 1);
+        *self.tombstones.entry(p).or_insert(0u64) += 1;
     }
 
     pub fn inc_alive(&mut self, p: Partition) {
-        self.increment(&mut self.alive, p, 1);
+        *self.alive.entry(p).or_insert(0u64) += 1;
     }
 
     pub fn inc_key_null(&mut self, p: Partition) {
-        self.increment(&mut self.key_null, p, 1);
+        *self.key_null.entry(p).or_insert(0u64) += 1;
     }
 
     pub fn inc_key_non_null(&mut self, p: Partition) {
-        self.increment(&mut self.key_non_null, p, 1);
+        *self.key_non_null.entry(p).or_insert(0u64) += 1;
     }
 
     pub fn inc_key_size_sum(&mut self, p: Partition, amount: u64) {
-        self.increment(&mut self.key_size_sum, p, amount);
+        *self.key_size_sum.entry(p).or_insert(0u64) += amount;
     }
 
     pub fn inc_value_size_sum(&mut self, p: Partition, amount: u64) {
-        self.increment(&mut self.value_size_sum, p, amount);
+        *self.value_size_sum.entry(p).or_insert(0u64) += amount;
     }
 
     ////////////////////////////////////////////////////////////////
@@ -195,10 +195,6 @@ impl Metrics {
 
     fn metric(&self, bucket: &PartitionedCounterBucket, p: Partition) -> u64 {
         bucket[&p]
-    }
-
-    fn increment(&mut self, bucket: &mut PartitionedCounterBucket, p: Partition, amount: u64) {
-        *bucket.entry(p).or_insert(0u64) += amount;
     }
 }
 
@@ -303,25 +299,4 @@ impl MetricHandler for LogCompactionMetrics {
             None => {}
         }
     }
-}
-
-#[test]
-fn test_metrics() {
-    let mut mr = Metrics::new();
-    mr.inc_total(0);
-    mr.inc_total(1);
-    mr.inc_total(1);
-    assert_eq!(*mr.registry.get("topic.messages.total").unwrap().get(&0).unwrap(), 1u64);
-    assert_eq!(*mr.registry.get("topic.messages.total").unwrap().get(&1).unwrap(), 2u64);
-}
-
-#[test]
-fn test_metric_getter() {
-    let mut mr = Metrics::new();
-    mr.inc_total(0);
-    mr.inc_total(1);
-    mr.inc_total(1);
-
-    assert_eq!(mr.total(0), 1u64);
-    assert_eq!(mr.total(1), 2u64);
 }
