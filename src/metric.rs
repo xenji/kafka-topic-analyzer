@@ -196,7 +196,10 @@ impl Metrics {
 
     #[inline]
     fn metric(&self, bucket: &PartitionedCounterBucket, p: Partition) -> u64 {
-        bucket[&p]
+        match bucket.get(&p) {
+            Some(v) => *v,
+            None => 0
+        }
     }
 }
 
