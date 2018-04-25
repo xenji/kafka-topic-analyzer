@@ -8,18 +8,21 @@ it from beginning to end and counting various metrics.
 
 ## Usage
     $> ./kafka-topic-analyzer -h
-    Kafka Topic Analyzer
+         Kafka Topic Analyzer
 
-    USAGE:
-        kafka-topic-analyzer --bootstrap-server <BOOTSTRAP_SERVER> --topic <TOPIC>
+         USAGE:
+             kafka-topic-analyzer [OPTIONS] --bootstrap-server <BOOTSTRAP_SERVER> --topic <TOPIC>
 
-    FLAGS:
-        -h, --help       Prints help information
-        -V, --version    Prints version information
+         FLAGS:
+             -h, --help       Prints help information
+             -V, --version    Prints version information
 
-    OPTIONS:
-        -b, --bootstrap-server <BOOTSTRAP_SERVER>    Bootstrap server(s) to work with, comma separated
-        -t, --topic <TOPIC>                          The topic to analyze
+         OPTIONS:
+             -b, --bootstrap-server <BOOTSTRAP_SERVER>                 Bootstrap server(s) to work with, comma separated
+             -c, --count-alive-keys <LOCAL_ALIVE_KEYS_STORAGE_PATH>
+                     Counts the effective number of alive keys in a log compacted topic by saving the state for each key in a
+                     local file and counting the result at the end of the read operation
+             -t, --topic <TOPIC>                                       The topic to analyze
 
 ## Example output
 ![Screenshot from a terminal that shows an example of the output](demo_output.png "Shows a sample output of the tool")
