@@ -16,9 +16,10 @@ use std::collections::HashMap;
 use prettytable::row::Row;
 use prettytable::cell::Cell;
 use clap::{App, Arg};
-use metric::Metrics;
+use metric::MessageMetrics;
 use std::fs;
-use metric::LogCompactionMetrics;
+use metric::AliveKeyMetrics;
+use std::env;
 
 mod kafka;
 mod metric;
@@ -48,10 +49,10 @@ fn main() {
         .arg(Arg::with_name("count-alive-keys")
             .short("c")
             .long("count-alive-keys")
-            .value_name("LOCAL_ALIVE_KEYS_STORAGE_PATH")
             .help("Counts the effective number of alive keys in a log compacted topic by saving the \
-            state for each key in a local file and counting the result at the end of the read operation")
-            .takes_value(true)
+            state for each key in a local file and counting the result at the end of the read operation.\
+            A key is 'alive' when it is present and has a non-null value in it's latest-offset version")
+            .default_value("./.cak-tmp")
             .required(false))
         .get_matches();
 
@@ -64,17 +65,11 @@ fn main() {
     let bootstrap_server = matches.value_of("bootstrap-server").unwrap();
 
     let mut log_compaction_metrics = match matches.value_of("count-alive-keys") {
-        Some(v) => {
-            if v == "." {
-                Some(LogCompactionMetrics::new("./tmp"))
-            } else {
-                Some(LogCompactionMetrics::new(v))
-            }
-        }
+        Some(_) => Some(AliveKeyMetrics::new(format!("{}/cak-tmp", env::temp_dir().to_str().unwrap()).as_str())),
         None => None
     };
 
-    let mut metrics = Metrics::new();
+    let mut metrics = MessageMetrics::new();
     {
         let mut topic_analyzer = kafka::TopicAnalyzer::new_from_bootstrap_servers(bootstrap_server);
         let offsets = topic_analyzer.get_topic_offsets(topic);
@@ -129,32 +124,32 @@ fn main() {
 
         println!("{}", "=".repeat(120));
         let mut table = Table::new();
-        table.add_row(row!["P", "|< OS", ">| OS", "Total", "Alive", "Tmb", "DR", "K Null", "K !Null", "P-Bytes", "K-Bytes", "V-Bytes", "A K-Sz", "A V-Sz", "A M-Sz"]);
+        table.add_row(row!["P", "< OS", "> OS", "Total", "Alive", "Tmb", "DR", "K Null", "K !Null", "P-Bytes", "K-Bytes", "V-Bytes", "A K-Sz", "A V-Sz", "A M-Sz"]);
 
 
         for partition in partitions {
             let key_size_avg = metrics.key_size_avg(partition);
             table.add_row(Row::new(vec![
-                Cell::new(format!("{}", partition).as_str()), // P
-                Cell::new(format!("{}", &start_offsets[&partition]).as_str()), // |< OS
-                Cell::new(format!("{}", &end_offsets[&partition]).as_str()), // OS >|
-                Cell::new(format!("{}", metrics_cloned.total(partition)).as_str()), // Total
-                Cell::new(format!("{}", metrics_cloned.alive(partition)).as_str()), // Alive
-                Cell::new(format!("{}", metrics_cloned.tombstones(partition)).as_str()), // TB
-                Cell::new(format!("{0:.4}", metrics_cloned.dirty_ratio(partition)).as_str()), // DR
-                Cell::new(format!("{}", metrics_cloned.key_null(partition)).as_str()), // K Null
-                Cell::new(format!("{}", metrics_cloned.key_non_null(partition)).as_str()), // K !Null
-                Cell::new(format!("{}", metrics_cloned.key_size_sum(partition) + metrics_cloned.value_size_sum(partition)).as_str()), // P-Bytes
-                Cell::new(format!("{}", metrics_cloned.key_size_sum(partition)).as_str()), // K-Bytes
-                Cell::new(format!("{}", metrics_cloned.value_size_sum(partition)).as_str()), // V-Bytes
-                Cell::new(format!("{}", key_size_avg).as_str()), // A-Key-Size
-                Cell::new(format!("{}", metrics_cloned.value_size_avg(partition)).as_str()), // A-V-Size
-                Cell::new(format!("{}", metrics_cloned.message_size_avg(partition)).as_str()), // A-M-Size
+                Cell::new(format!("{}", partition).as_str()),
+                Cell::new(format!("{}", &start_offsets[&partition]).as_str()),
+                Cell::new(format!("{}", &end_offsets[&partition]).as_str()),
+                Cell::new(format!("{}", metrics_cloned.total(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.alive(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.tombstones(partition)).as_str()),
+                Cell::new(format!("{0:.4}", metrics_cloned.dirty_ratio(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.key_null(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.key_non_null(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.key_size_sum(partition) + metrics_cloned.value_size_sum(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.key_size_sum(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.value_size_sum(partition)).as_str()),
+                Cell::new(format!("{}", key_size_avg).as_str()),
+                Cell::new(format!("{}", metrics_cloned.value_size_avg(partition)).as_str()),
+                Cell::new(format!("{}", metrics_cloned.message_size_avg(partition)).as_str()),
             ]));
         }
 
         println!("| K = Key, V = Value, P = Partition, Tmb = Tombstone(s), Sz = Size");
-        println!("| DR = Dirty Ratio, A = Average, Lst = last, |< OS = start offset, >| OS = end offset");
+        println!("| DR = Dirty Ratio, A = Average, Lst = last, < OS = start offset, > OS = end offset");
         table.printstd();
         println!();
         println!("{}", "=".repeat(120));

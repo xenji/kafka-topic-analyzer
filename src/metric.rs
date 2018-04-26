@@ -10,7 +10,7 @@ type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
 
 #[derive(Debug, Clone)]
-pub struct Metrics {
+pub struct MessageMetrics {
     total_messages: PartitionedCounterBucket,
     tombstones: PartitionedCounterBucket,
     alive: PartitionedCounterBucket,
@@ -26,13 +26,13 @@ pub struct Metrics {
     overall_count: u64,
 }
 
-pub struct LogCompactionMetrics {
+pub struct AliveKeyMetrics {
     rocks: DB
 }
 
-impl Metrics {
-    pub fn new() -> Metrics {
-        Metrics {
+impl MessageMetrics {
+    pub fn new() -> MessageMetrics {
+        MessageMetrics {
             total_messages: PartitionedCounterBucket::new(),
             tombstones: PartitionedCounterBucket::new(),
             alive: PartitionedCounterBucket::new(),
@@ -203,7 +203,7 @@ impl Metrics {
     }
 }
 
-impl MetricHandler for Metrics {
+impl MetricHandler for MessageMetrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         let partition = m.partition();
         let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
@@ -253,12 +253,12 @@ impl MetricHandler for Metrics {
     }
 }
 
-impl LogCompactionMetrics {
-    pub fn new(storage_path: &str) -> LogCompactionMetrics {
+impl AliveKeyMetrics {
+    pub fn new(storage_path: &str) -> AliveKeyMetrics {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_compression_type(DBCompressionType::Snappy);
-        LogCompactionMetrics {
+        AliveKeyMetrics {
             rocks: DB::open(&opts, if storage_path != "." {
                 storage_path
             } else {
@@ -286,7 +286,7 @@ impl LogCompactionMetrics {
     }
 }
 
-impl MetricHandler for LogCompactionMetrics {
+impl MetricHandler for AliveKeyMetrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         // No counting for un-keyed topics
         match m.key() {
@@ -305,7 +305,7 @@ impl MetricHandler for LogCompactionMetrics {
     }
 }
 
-impl Drop for LogCompactionMetrics {
+impl Drop for AliveKeyMetrics {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
         fs::remove_dir_all(self.rocks.path());
