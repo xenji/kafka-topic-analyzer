@@ -277,8 +277,7 @@ impl LogCompactionMetrics {
 
     pub fn sum_all_alive(&self) -> u64 {
         let mut valid = 0u64;
-        let iter = self.rocks.iterator(IteratorMode::Start);
-        for (_, value) in iter {
+        for (_, value) in self.rocks.iterator(IteratorMode::Start) {
             if value[0] == 1 {
                 valid += 1;
             }
@@ -309,7 +308,6 @@ impl MetricHandler for LogCompactionMetrics {
 impl Drop for LogCompactionMetrics {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
-        let path = self.rocks.path();
-        fs::remove_dir_all(path);
+        fs::remove_dir_all(self.rocks.path());
     }
 }
