@@ -8,6 +8,9 @@ extern crate chrono;
 #[macro_use]
 extern crate prettytable;
 extern crate indicatif;
+extern crate fnv;
+extern crate bitmap;
+
 extern crate rocksdb;
 
 use prettytable::Table;
@@ -23,6 +26,7 @@ use std::env;
 
 mod kafka;
 mod metric;
+mod in_mem_cdc;
 
 fn main() {
     env_logger::init();

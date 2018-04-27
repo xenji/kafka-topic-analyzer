@@ -18,6 +18,9 @@ chrono = "~0.4"
 indicatif = "0.9.0"
 rdkafka = "~0.15"
 rocksdb = "~0.10"
+fnv = "1.0.6"
+bitmap = { version = "3.1.3", features = ["collections"] }
+collections = "*"
 
 [features]
 # We re-export the dynamic linking feature here to enable the user of this tool to decide wheter
