@@ -17,7 +17,6 @@ use prettytable::row::Row;
 use prettytable::cell::Cell;
 use clap::{App, Arg};
 use metric::MessageMetrics;
-use std::fs;
 use metric::AliveKeyMetrics;
 use std::env;
 
@@ -117,7 +116,6 @@ fn main() {
                 println!("{}", "-".repeat(120));
                 println!("Alive keys: {}", l.sum_all_alive());
                 println!("{}", "-".repeat(120));
-                fs::remove_dir_all(matches.value_of("count-alive-keys").unwrap()).unwrap();
             }
             None => {}
         }
