@@ -8,7 +8,7 @@ extern crate chrono;
 #[macro_use]
 extern crate prettytable;
 extern crate indicatif;
-extern crate rocksdb;
+extern crate bit_set;
 
 use prettytable::Table;
 use std::time::Instant;
@@ -17,11 +17,11 @@ use prettytable::row::Row;
 use prettytable::cell::Cell;
 use clap::{App, Arg};
 use metric::MessageMetrics;
-use metric::AliveKeyMetrics;
-use std::env;
+use metric::LogCompactionInMemoryMetrics;
 
 mod kafka;
 mod metric;
+mod fnv32;
 
 fn main() {
     env_logger::init();
@@ -51,7 +51,6 @@ fn main() {
             .help("Counts the effective number of alive keys in a log compacted topic by saving the \
             state for each key in a local file and counting the result at the end of the read operation.\
             A key is 'alive' when it is present and has a non-null value in it's latest-offset version")
-            .default_value("./.cak-tmp")
             .required(false))
         .get_matches();
 
@@ -63,9 +62,9 @@ fn main() {
     let topic = matches.value_of("topic").unwrap();
     let bootstrap_server = matches.value_of("bootstrap-server").unwrap();
 
-    let mut log_compaction_metrics = match matches.value_of("count-alive-keys") {
-        Some(_) => Some(AliveKeyMetrics::new(format!("{}/cak-tmp", env::temp_dir().to_str().unwrap()).as_str())),
-        None => None
+    let mut log_compaction_metrics = match matches.occurrences_of("count-alive-keys") {
+        1 => Some(LogCompactionInMemoryMetrics::new()),
+        _ => None
     };
 
     let mut metrics = MessageMetrics::new();

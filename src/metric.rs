@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::fs;
 use chrono::prelude::*;
-use rocksdb::{DB, Options, DBCompressionType, IteratorMode};
-
+use fnv32::FnvHasher;
 use kafka::MetricHandler;
 use rdkafka::message::{Message, BorrowedMessage};
+use bit_set::BitSet;
 
 type Partition = i32;
 type PartitionedCounterBucket = HashMap<Partition, u64>;
@@ -26,9 +25,6 @@ pub struct MessageMetrics {
     overall_count: u64,
 }
 
-pub struct AliveKeyMetrics {
-    rocks: DB
-}
 
 impl MessageMetrics {
     pub fn new() -> MessageMetrics {
@@ -253,40 +249,40 @@ impl MetricHandler for MessageMetrics {
     }
 }
 
-impl AliveKeyMetrics {
-    pub fn new(storage_path: &str) -> AliveKeyMetrics {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.set_compression_type(DBCompressionType::Snappy);
-        AliveKeyMetrics {
-            rocks: DB::open(&opts, if storage_path != "." {
-                storage_path
-            } else {
-                "./tmp"
-            }).unwrap()
+
+fn fnv1a(bytes: &[u8]) -> usize {
+    let mut hasher = FnvHasher::default();
+    hasher.write(bytes);
+    hasher.finish() as usize // FIXME: this makes the binary incompatible with any non 64bit system
+}
+
+pub struct LogCompactionInMemoryMetrics {
+    store: Box<BitSet>
+}
+
+impl LogCompactionInMemoryMetrics {
+    pub fn new() -> LogCompactionInMemoryMetrics {
+        LogCompactionInMemoryMetrics {
+            store: Box::new(BitSet::new())
         }
     }
 
     pub fn mark_key_alive(&mut self, key: &[u8]) {
-        self.rocks.put(key, &[1u8]).unwrap();
+        let k = fnv1a(key);
+        self.store.insert(k);
     }
 
     pub fn mark_key_dead(&mut self, key: &[u8]) {
-        self.rocks.put(key, &[0u8]).unwrap();
+        self.store.remove(fnv1a(key));
     }
 
-    pub fn sum_all_alive(&self) -> u64 {
-        let mut valid = 0u64;
-        for (_, value) in self.rocks.iterator(IteratorMode::Start) {
-            if value[0] == 1 {
-                valid += 1;
-            }
-        }
-        valid
+    pub fn sum_all_alive(&self) -> usize {
+        self.store.len()
     }
 }
 
-impl MetricHandler for AliveKeyMetrics {
+
+impl MetricHandler for LogCompactionInMemoryMetrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         // No counting for un-keyed topics
         match m.key() {
@@ -302,12 +298,5 @@ impl MetricHandler for AliveKeyMetrics {
             }
             None => {}
         }
-    }
-}
-
-impl Drop for AliveKeyMetrics {
-    #[allow(unused_must_use)]
-    fn drop(&mut self) {
-        fs::remove_dir_all(self.rocks.path());
     }
 }
