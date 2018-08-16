@@ -175,7 +175,11 @@ impl MessageMetrics {
     }
 
     pub fn smallest_message(&self) -> u64 {
-        self.smallest_message
+        if self.smallest_message == <u64>::max_value() {
+            0
+        } else {
+            self.smallest_message
+        }
     }
 
     pub fn largest_message(&self) -> u64 {
