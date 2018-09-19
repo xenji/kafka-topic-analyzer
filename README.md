@@ -14,12 +14,12 @@ it from beginning to end and counting various metrics.
              kafka-topic-analyzer [FLAGS] --bootstrap-server <BOOTSTRAP_SERVER> --topic <TOPIC>
 
          FLAGS:
-             -c, --count-alive-keys  <PATH_TO_STATE_DIR>    Counts the effective number of alive keys in a log compacted topic by saving the state for
-                                                            each key in a local file and counting the result at the end of the read operation.A key is
-                                                            'alive' when it is present and has a non-null value in it's latest-offset version.Requires
-                                                            a filesystem path where the keys are stored temporarily.
-             -h, --help                                     Prints help information
-             -V, --version                                  Prints version information
+             -c, --count-alive-keys  <LOCAL_ALIVE_KEYS_STORAGE_PATH>    Counts the effective number of alive keys in a log compacted topic by saving the state for
+                                                                        each key in a local file and counting the result at the end of the read operation.A key is
+                                                                        'alive' when it is present and has a non-null value in it's latest-offset version.Requires
+                                                                        a storage path where the keys are stored temporarily.
+             -h, --help                                                 Prints help information
+             -V, --version                                              Prints version information
 
          OPTIONS:
              -b, --bootstrap-server <BOOTSTRAP_SERVER>    Bootstrap server(s) to work with, comma separated
