@@ -17,7 +17,7 @@ use metric::MessageMetrics;
 use prettytable::cell::Cell;
 use prettytable::row::Row;
 use prettytable::Table;
-use std::cmp;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -103,7 +103,7 @@ fn main() {
         println!("Calculating statistics...");
         println!("Topic {}", topic);
         println!("Scanning took: {} seconds", duration_secs);
-        println!("Estimated Msg/s: {}", (metrics_cloned.overall_count() / cmp::max(duration_secs, 1)));
+        println!("Estimated Msg/s: {}", (metrics_cloned.overall_count() / max(duration_secs, 1)));
         println!("{}", "-".repeat(120));
         println!("Earliest Message: {}", metrics_cloned.earliest_message());
         println!("Latest Message: {}", metrics_cloned.latest_message());
