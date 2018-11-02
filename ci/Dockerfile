@@ -18,6 +18,7 @@ RUN apt-get update && \
     liblz4-dev \
     libzstd-dev \
     build-essential \
+    python \
     g++ \
     gcc
 

@@ -175,7 +175,11 @@ impl MessageMetrics {
     }
 
     pub fn smallest_message(&self) -> u64 {
-        self.smallest_message
+        if self.smallest_message == <u64>::max_value() {
+            0
+        } else {
+            self.smallest_message
+        }
     }
 
     pub fn largest_message(&self) -> u64 {
@@ -205,7 +209,6 @@ impl MetricHandler for MessageMetrics {
         let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
         let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
         let mut message_size: u64 = 0;
-        let mut empty_key = false;
         let mut empty_value = false;
 
         self.inc_overall_count();
@@ -221,7 +224,6 @@ impl MetricHandler for MessageMetrics {
                 k
             }
             None => {
-                empty_key = true;
                 self.inc_key_null(partition);
                 &[]
             }
@@ -243,7 +245,7 @@ impl MetricHandler for MessageMetrics {
 
         self.cmp_and_set_message_timestamp(timestamp);
 
-        if !empty_key && !empty_value {
+        if !empty_value {
             self.cmp_and_set_message_size(message_size);
         }
     }

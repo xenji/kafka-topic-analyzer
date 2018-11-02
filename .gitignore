@@ -1,4 +1,4 @@
 /target
 **/*.rs.bk
 cmake*/
-.idea/
+.idea
