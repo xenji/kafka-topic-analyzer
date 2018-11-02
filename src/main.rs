@@ -1,23 +1,25 @@
+extern crate bit_set;
+extern crate chrono;
 extern crate clap;
+extern crate core;
 extern crate env_logger;
+extern crate indicatif;
 #[macro_use]
 extern crate log;
-extern crate rdkafka;
-extern crate uuid;
-extern crate chrono;
 #[macro_use]
 extern crate prettytable;
-extern crate indicatif;
-extern crate bit_set;
+extern crate rdkafka;
+extern crate uuid;
 
-use prettytable::Table;
-use std::time::Instant;
-use std::collections::HashMap;
-use prettytable::row::Row;
-use prettytable::cell::Cell;
 use clap::{App, Arg};
-use metric::MessageMetrics;
 use metric::LogCompactionInMemoryMetrics;
+use metric::MessageMetrics;
+use prettytable::cell::Cell;
+use prettytable::row::Row;
+use prettytable::Table;
+use std::cmp::max;
+use std::collections::HashMap;
+use std::time::Instant;
 
 mod kafka;
 mod metric;
@@ -84,7 +86,7 @@ fn main() {
         match log_compaction_metrics.as_mut() {
             Some(l) => {
                 topic_analyzer.add_metric_handler(l);
-            },
+            }
             None => {}
         }
 
@@ -101,7 +103,7 @@ fn main() {
         println!("Calculating statistics...");
         println!("Topic {}", topic);
         println!("Scanning took: {} seconds", duration_secs);
-        println!("Estimated Msg/s: {}", (metrics_cloned.overall_count() / duration_secs));
+        println!("Estimated Msg/s: {}", (metrics_cloned.overall_count() / max(duration_secs, 1)));
         println!("{}", "-".repeat(120));
         println!("Earliest Message: {}", metrics_cloned.earliest_message());
         println!("Latest Message: {}", metrics_cloned.latest_message());
