@@ -30,6 +30,8 @@ fn main() {
 
     let matches = App::new("Kafka Topic Analyzer")
         .bin_name("kafka-topic-analyzer")
+        
+        .version("0.4.1")
 
         .arg(Arg::with_name("topic")
             .short("t")
