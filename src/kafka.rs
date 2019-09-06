@@ -12,7 +12,7 @@ pub type KafkaConsumer = BaseConsumer<DefaultConsumerContext>;
 
 pub struct TopicAnalyzer<'a> {
     consumer: KafkaConsumer,
-    metric_handlers: Vec<&'a mut MetricHandler>,
+    metric_handlers: Vec<&'a mut dyn MetricHandler>,
 }
 
 pub trait MetricHandler {
@@ -41,7 +41,7 @@ impl<'a> TopicAnalyzer<'a> {
         }
     }
 
-    pub fn add_metric_handler(&mut self, handler: &'a mut MetricHandler) {
+    pub fn add_metric_handler(&mut self, handler: &'a mut dyn MetricHandler) {
         self.metric_handlers.push(handler);
     }
 
