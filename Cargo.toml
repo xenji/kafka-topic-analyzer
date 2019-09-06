@@ -9,15 +9,15 @@ categories = ["command-line-utilities"]
 description = "An analyzer for getting metrics about the contents of a Apache Kafka topic"
 
 [dependencies]
-clap = "~2.32"
-env_logger = "~0.6"
-log = "~0.4"
-prettytable-rs = "~0.8"
-uuid = { version = "~0.7", features = ["v4"] }
-chrono = "~0.4"
+clap = "2.33.0"
+env_logger = "0.6.2"
+log = "0.4.8"
+prettytable-rs = "0.8.0"
+uuid = { version = "0.7.4", features = ["v4"] }
+chrono = "0.4.9"
 indicatif = "0.11.0"
-rdkafka = "~0.17"
-bit-set = "~0.5"
+rdkafka = "0.21.0"
+bit-set = "0.5.1"
 
 [features]
 # We re-export the dynamic linking feature here to enable the user of this tool to decide wheter
