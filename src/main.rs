@@ -20,6 +20,7 @@ use prettytable::Table;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::time::Instant;
+use std::process::exit;
 
 mod kafka;
 mod metric;
@@ -77,6 +78,11 @@ fn main() {
         let offsets = topic_analyzer.get_topic_offsets(topic);
         start_offsets = offsets.0;
         end_offsets = offsets.1;
+
+        if end_offsets.values().all(|v| *v == 0i64) {
+            error!("Given topic has no content, no analysis possible. Exiting.");
+            exit(-2)
+        }
 
         for v in start_offsets.keys() {
             partitions.push(*v);
