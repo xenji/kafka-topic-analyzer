@@ -88,9 +88,9 @@ impl<'a> TopicAnalyzer<'a> {
                     let partition = m.partition();
                     let offset = m.offset();
 
-
-                    let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
-                    let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
+                    let timestamp = m.timestamp().to_millis().unwrap_or(0);
+                    let parsed_naive_timestamp = NaiveDateTime::from_timestamp(timestamp / 1000, 0);
+                    let timestamp_dt = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
 
                     for mh in self.metric_handlers.iter_mut() {
                         mh.handle_message(&m);
@@ -98,7 +98,7 @@ impl<'a> TopicAnalyzer<'a> {
 
                     pb.set_message(
                         format!("[Sq: {} | T: {} | P: {} | O: {} | Ts: {}]",
-                                seq, topic, partition, offset, timestamp).as_str());
+                                seq, topic, partition, offset, timestamp_dt).as_str());
 
                     if let Err(e) = self.consumer.store_offset(&m) {
                         warn!("Error while storing offset: {}", e);

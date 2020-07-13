@@ -206,8 +206,9 @@ impl MessageMetrics {
 impl MetricHandler for MessageMetrics {
     fn handle_message<'b>(&mut self, m: &BorrowedMessage<'b>) where BorrowedMessage<'b>: Message {
         let partition = m.partition();
-        let parsed_naive_timestamp = NaiveDateTime::from_timestamp(m.timestamp().to_millis().unwrap() / 1000, 0);
-        let timestamp = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
+        let timestamp = m.timestamp().to_millis().unwrap_or(0);
+        let parsed_naive_timestamp = NaiveDateTime::from_timestamp(timestamp / 1000, 0);
+        let timestamp_dt = DateTime::<Utc>::from_utc(parsed_naive_timestamp, Utc);
         let mut message_size: u64 = 0;
         let mut empty_value = false;
 
@@ -243,7 +244,7 @@ impl MetricHandler for MessageMetrics {
             }
         }
 
-        self.cmp_and_set_message_timestamp(timestamp);
+        self.cmp_and_set_message_timestamp(timestamp_dt);
 
         if !empty_value {
             self.cmp_and_set_message_size(message_size);
