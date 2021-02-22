@@ -50,6 +50,13 @@ fn main() {
             .takes_value(true)
             .required(true)
         )
+        .arg(Arg::with_name("librdkafka")
+            .long("librdkafka")
+            .value_name("LIBRDKAFKA")
+            .help("Options to pass into the underlying librdkafka, comma seperated key=value pairs")
+            .takes_value(true)
+            .required(false)
+        )
         .arg(Arg::with_name("count-alive-keys")
             .short("c")
             .long("count-alive-keys")
@@ -74,7 +81,16 @@ fn main() {
 
     let mut metrics = MessageMetrics::new();
     {
-        let mut topic_analyzer = kafka::TopicAnalyzer::new_from_bootstrap_servers(bootstrap_server);
+        let librdkafka_config = match matches.value_of("librdkafka") {
+            Some(string_of_pairs) => string_of_pairs
+                .split(",")
+                .map(|kv| kv.split('='))
+                .map(|mut kv| (kv.next().unwrap().into(),
+                               kv.next().unwrap().into()))
+                .collect::<HashMap<String, String>>(),
+            None =>  HashMap::new()
+        };
+        let mut topic_analyzer = kafka::TopicAnalyzer::new_from_bootstrap_servers(bootstrap_server, &librdkafka_config);
         let offsets = topic_analyzer.get_topic_offsets(topic);
         start_offsets = offsets.0;
         end_offsets = offsets.1;

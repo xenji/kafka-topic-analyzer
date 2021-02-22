@@ -20,12 +20,12 @@ pub trait MetricHandler {
 }
 
 impl<'a> TopicAnalyzer<'a> {
-    pub fn new_from_bootstrap_servers(bootstrap_server: &str) -> TopicAnalyzer<'a> {
-        TopicAnalyzer {
-            consumer: ClientConfig::new()
-                // we use ENV["USER"] to make the analyzer identify-able. It can emit quite a lot of load
-                // on the cluster, so you might want to see who this is.
-                .set("group.id", format!("topic-analyzer--{}-{}", env!("USER"), Uuid::new_v4()).as_str())
+    pub fn new_from_bootstrap_servers(bootstrap_server: &str, librdkafka_settings: &HashMap<String, String>) -> TopicAnalyzer<'a> {
+        let mut client_config: ClientConfig = {
+            let mut cfg = ClientConfig::new();
+            // we use ENV["USER"] to make the analyzer identify-able. It can emit quite a lot of load
+            // on the cluster, so you might want to see who this is.
+            cfg.set("group.id", format!("topic-analyzer--{}-{}", env!("USER"), Uuid::new_v4()).as_str())
                 .set("bootstrap.servers", bootstrap_server)
                 .set("enable.partition.eof", "false")
                 .set("auto.offset.reset", "earliest")
@@ -33,7 +33,19 @@ impl<'a> TopicAnalyzer<'a> {
                 .set("api.version.request", "true")
                 .set("enable.auto.offset.store", "false")
                 .set("client.id", "topic-analyzer")
-                .set("queue.buffering.max.ms", "1000")
+                .set("queue.buffering.max.ms", "1000");
+
+            librdkafka_settings.iter()
+                .for_each(|(k, v)| {
+                    cfg.set(k, v);
+                    ()
+                });
+            cfg
+        };
+
+
+        TopicAnalyzer {
+            consumer: client_config
                 .set_log_level(RDKafkaLogLevel::Info)
                 .create()
                 .expect("Consumer creation failed"),
