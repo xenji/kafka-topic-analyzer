@@ -16,7 +16,7 @@ prettytable-rs = "0.8.0"
 uuid = { version = "0.7.4", features = ["v4"] }
 chrono = "0.4.19"
 indicatif = "0.15.0"
-rdkafka = "0.25.0"
+rdkafka = { version = "0.25.0", features = ["ssl"] }
 bit-set = "0.5.2"
 
 [features]
